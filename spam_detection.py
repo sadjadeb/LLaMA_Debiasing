@@ -3,27 +3,25 @@ import torch
 from peft import get_peft_model, LoraConfig, TaskType
 from transformers import LlamaTokenizer, LlamaForSequenceClassification
 from torch.utils.data import DataLoader
-
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 from tqdm import tqdm
 
 model_name = "meta-llama/Llama-2-7b-hf"
-device_type = 'cpu'
+device_type = 'cuda:1'
 device = torch.device(device_type)
-batch_size = 16
+batch_size = 4
 epochs = 1
+data_path = '../collective_opinion_spam_detection/'
 
-reviews = pd.read_csv('/content/content/reviewContent', sep='\t', header=None)
+reviews = pd.read_csv(data_path + 'reviewContent', sep='\t', header=None)
 reviews.columns = ['user_id', 'product_id', 'date', 'review']
 
-reviews_metadata = pd.read_csv('/content/content/metadata', sep='\t', header=None)
+reviews_metadata = pd.read_csv(data_path + 'metadata', sep='\t', header=None)
 reviews_metadata.columns = ['user_id', 'product_id', 'rating', 'spam', 'date']
 reviews_metadata['spam'] = reviews_metadata['spam'].replace(-1, 0)
 
 df = pd.merge(reviews, reviews_metadata, on=['user_id', 'product_id', 'date'])
-
-df = df.sample(n=1000, random_state=42)
 
 train_df, test_df = train_test_split(df, test_size=0.3, random_state=42)
 train_df = train_df.reset_index(drop=True)
@@ -39,8 +37,6 @@ model = get_peft_model(model, peft_config)
 model.print_trainable_parameters()
 model.to(device)
 
-tokenizer.add_special_tokens({"pad_token": "<pad>"})
-model.config.pad_token_id = tokenizer.pad_token_id
 
 # Tokenize the review text for train set
 train_encodings = tokenizer(list(train_df['review']), truncation=True, padding=True, max_length=256)
@@ -49,7 +45,6 @@ train_labels = torch.tensor(list(train_df['spam']))
 # Tokenize the review text for test set
 test_encodings = tokenizer(list(test_df['review']), truncation=True, padding=True, max_length=256)
 test_labels = torch.tensor(list(test_df['spam']))
-
 
 train_dataset = torch.utils.data.TensorDataset(torch.tensor(train_encodings['input_ids']),
                                                torch.tensor(train_encodings['attention_mask']),
@@ -70,10 +65,9 @@ for epoch in range(epochs):
     total_loss = 0
 
     for batch in tqdm(train_loader):
-        batch = tuple(t.to(device) for t in batch)
-        inputs = {'input_ids': batch[0],
-                  'attention_mask': batch[1],
-                  'labels': batch[2]}
+        inputs = {'input_ids': batch[0].to(device),
+                  'attention_mask': batch[1].to(device),
+                  'labels': batch[2].to(device)}
 
         optimizer.zero_grad()
         outputs = model(**inputs)
@@ -104,5 +98,20 @@ with torch.no_grad():
         predictions.extend(predicted_labels.cpu().numpy())
         true_labels.extend(inputs['labels'].cpu().numpy())
 
-report = classification_report(true_labels, predictions)
-print(report)
+# Calculate precision
+precision = precision_score(true_labels, predictions)
+
+# Calculate recall
+recall = recall_score(true_labels, predictions)
+
+# Calculate F1 score
+f1 = f1_score(true_labels, predictions)
+
+# Calculate accuracy score
+accuracy = accuracy_score(true_labels, predictions)
+
+# Print the results
+print(f'Precision: {precision:.4f}')
+print(f'Recall: {recall:.4f}')
+print(f'F1 Score: {f1:.4f}')
+print(f'Accuracy Score: {accuracy:.4f}')
