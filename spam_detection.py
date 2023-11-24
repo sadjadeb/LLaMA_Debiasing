@@ -1,7 +1,7 @@
 import pandas as pd
 import torch
 from peft import get_peft_model, LoraConfig, TaskType
-from transformers import LlamaTokenizer, LlamaForSequenceClassification
+from transformers import LlamaTokenizer, LlamaForSequenceClassification, BertTokenizer, BertForSequenceClassification
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
@@ -29,8 +29,13 @@ test_df = test_df.reset_index(drop=True)
 print(f"Number of training samples: {len(train_df)}")
 print(f"Number of testing samples: {len(test_df)}")
 
-tokenizer = LlamaTokenizer.from_pretrained(model_name)
-model = LlamaForSequenceClassification.from_pretrained(model_name)
+# tokenizer = LlamaTokenizer.from_pretrained(model_name)
+# model = LlamaForSequenceClassification.from_pretrained(model_name, num_labels=2)
+# tokenizer.pad_token = tokenizer.eos_token
+# model.config.pad_token_id = tokenizer.pad_token_id
+
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2)
 
 peft_config = LoraConfig(task_type=TaskType.SEQ_CLS, inference_mode=False, r=8, lora_alpha=32, lora_dropout=0.2)
 model = get_peft_model(model, peft_config)
