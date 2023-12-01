@@ -1,7 +1,8 @@
 import sys
 import json
 from torch.utils.data import DataLoader
-from sentence_transformers import models, SentenceTransformer, InputExample
+from sentence_transformers import SentenceTransformer, InputExample
+from sentence_transformers.models import Pooling, Transformer
 from sentence_transformers.losses import MarginMSELoss
 from torch.utils.data import Dataset
 import random
@@ -9,8 +10,9 @@ import gzip
 import os
 import tqdm
 import pickle
-from transformers import logging
+from transformers import logging, LlamaConfig
 import gc
+from peft import get_peft_model, LoraConfig, TaskType
 
 logging.set_verbosity_error()
 
@@ -18,20 +20,30 @@ logging.set_verbosity_error()
 LOCAL = True if sys.platform == 'win32' else False
 model_name = "meta-llama/Llama-2-7b-hf"
 model_save_path = f'output/bi-encoder_margin-mse_{model_name.split("/")[-1]}'
-train_batch_size = 4 if LOCAL else 32
+batch_size = 32
 device = 'cpu' if LOCAL else 'cuda:1'
-max_passages = 2e6
+max_passages = 2e1
 max_seq_length = 512
 num_negs_per_system = 15
 num_epochs = 1
 warmup_steps = 1000
-use_pre_trained_model = False
+use_amp = True
 
 os.makedirs(model_save_path, exist_ok=True)
 
-word_embedding_model = models.Transformer(model_name, max_seq_length=max_seq_length)
-pooling_model = models.Pooling(word_embedding_model.get_word_embedding_dimension(), "mean")
-model = SentenceTransformer(modules=[word_embedding_model, pooling_model])
+word_embedding_model = Transformer(model_name, max_seq_length=max_seq_length)
+
+if isinstance(word_embedding_model.auto_model.config, LlamaConfig):
+    batch_size = 3
+    use_amp = False
+    peft_config = LoraConfig(task_type=TaskType.FEATURE_EXTRACTION, inference_mode=False, r=32, lora_alpha=64, lora_dropout=0.1)
+    word_embedding_model.auto_model = get_peft_model(word_embedding_model.auto_model, peft_config)
+    word_embedding_model.auto_model.print_trainable_parameters()
+    word_embedding_model.tokenizer.pad_token = word_embedding_model.tokenizer.eos_token
+    word_embedding_model.auto_model.config.pad_token_id = word_embedding_model.tokenizer.pad_token_id
+
+pooling_model = Pooling(word_embedding_model.get_word_embedding_dimension(), "mean")
+model = SentenceTransformer(modules=[word_embedding_model, pooling_model], device=device)
 
 # Now we read the MS Marco dataset
 data_folder = '/home/sajadeb/msmarco'
@@ -143,7 +155,7 @@ class MSMARCODataset(Dataset):
 
 # For training the SentenceTransformer model, we need a dataset, a dataloader, and a loss used for training.
 train_dataset = MSMARCODataset(queries=train_queries, corpus=corpus, ce_scores=ce_scores)
-train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=train_batch_size, drop_last=True)
+train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, drop_last=True)
 train_loss = MarginMSELoss(model=model)
 
 del corpus
@@ -157,7 +169,7 @@ gc.collect()
 model.fit(train_objectives=[(train_dataloader, train_loss)],
           epochs=num_epochs,
           warmup_steps=warmup_steps,
-          use_amp=True,
+          use_amp=use_amp,
           optimizer_params={'lr': 2e-5},
           )
 
