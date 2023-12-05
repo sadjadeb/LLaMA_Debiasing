@@ -8,6 +8,7 @@ from transformers import LlamaConfig
 from sentence_transformers import SentenceTransformer, models, losses, InputExample
 from torch.utils.data import Dataset, DataLoader
 from tqdm.autonotebook import tqdm
+from transformers import AdamW
 
 data_folder = '/home/sajadeb/msmarco'
 LOCAL = True if sys.platform == 'win32' else False
@@ -127,6 +128,7 @@ train_loss = losses.MultipleNegativesRankingLoss(model=model)
 model.fit(train_objectives=[(train_dataloader, train_loss)],
           epochs=num_epochs,
           warmup_steps=warmup_steps,
+          optimizer_class=AdamW,
           optimizer_params={'lr': 2e-5, 'eps': 1e-6, 'correct_bias': False},
           output_path=model_save_path,
           use_amp=use_amp)
