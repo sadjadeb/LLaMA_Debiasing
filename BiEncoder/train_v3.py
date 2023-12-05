@@ -1,58 +1,50 @@
 import gzip
 import json
-import logging
 import os
-import pathlib
 import random
-
-from beir import util, LoggingHandler
-from beir.datasets.data_loader import GenericDataLoader
-from beir.retrieval.train import TrainRetriever
+import sys
 from sentence_transformers import SentenceTransformer, models, losses, InputExample
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from tqdm.autonotebook import tqdm
 
-#### Just some code to print debug information to stdout
-logging.basicConfig(format='%(asctime)s - %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S',
-                    level=logging.INFO,
-                    handlers=[LoggingHandler()])
-#### /print debug information to stdout
+data_folder = '/home/sajadeb/msmarco'
+LOCAL = True if sys.platform == 'win32' else False
+model_name = "bert-base-uncased"
+model_save_path = f'output/bi-encoder_margin-mse_{model_name.split("/")[-1]}_v3'
+batch_size = 32
+device = 'cpu' if LOCAL else 'cuda:1'
+max_seq_length = 512
+ce_score_margin = 3
+num_epochs = 1
+num_negs_per_system = 15
+warmup_steps = 1000
+use_amp = True
+os.makedirs(model_save_path, exist_ok=True)
 
-#### Download msmarco.zip dataset and unzip the dataset
-dataset = "msmarco"
-url = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{}.zip".format(dataset)
-out_dir = os.path.join(pathlib.Path(__file__).parent.absolute(), "datasets")
-data_path = util.download_and_unzip(url, out_dir)
+word_embedding_model = models.Transformer(model_name, max_seq_length=max_seq_length)
+pooling_model = models.Pooling(word_embedding_model.get_word_embedding_dimension())
+model = SentenceTransformer(modules=[word_embedding_model, pooling_model], device=device)
 
-### Load BEIR MSMARCO training dataset, this will be used for query and corpus for reference.
-corpus, queries, _ = GenericDataLoader(data_path).load(split="train")
+# Read the corpus files, that contain all the passages. Store them in the corpus dict
+corpus = {}
+collection_filepath = os.path.join(data_folder, 'collection.tsv')
+with open(collection_filepath, 'r', encoding='utf8') as f:
+    print('Loading collection...')
+    for line in f:
+        pid, passage = line.strip().split("\t")
+        corpus[pid] = {'text': passage, 'title': ''}
 
-#################################
-#### Parameters for Training ####
-#################################
+# Read the train queries, store in queries dict
+queries = {}
+queries_filepath = os.path.join(data_folder, 'queries.train.tsv')
+with open(queries_filepath, 'r', encoding='utf8') as fIn:
+    print('Loading queries...')
+    for line in fIn:
+        qid, query = line.strip().split("\t")
+        queries[qid] = query
 
-train_batch_size = 75  # Increasing the train batch size improves the model performance, but requires more GPU memory (O(n))
-max_seq_length = 350  # Max length for passages. Increasing it, requires more GPU memory (O(n^2))
-ce_score_margin = 3  # Margin for the CrossEncoder score between negative and positive passages
-num_negs_per_system = 5  # We used different systems to mine hard negatives. Number of hard negatives to add from each system
-
-##################################################
-#### Download MSMARCO Hard Negs Triplets File ####
-##################################################
-
-triplets_url = "https://sbert.net/datasets/msmarco-hard-negatives.jsonl.gz"
-msmarco_triplets_filepath = os.path.join(data_path, "msmarco-hard-negatives.jsonl.gz")
-if not os.path.isfile(msmarco_triplets_filepath):
-    util.download_url(triplets_url, msmarco_triplets_filepath)
-
-#### Load the hard negative MSMARCO jsonl triplets from SBERT
-#### These contain a ce-score which denotes the cross-encoder score for the query and passage.
-#### We chose a margin between positive and negative passage scores => above which consider negative as hard negative.
-#### Finally to limit the number of negatives per passage, we define num_negs_per_system across all different systems.
-
-logging.info("Loading MSMARCO hard-negatives...")
-
+print("Loading MSMARCO hard-negatives...")
+msmarco_triplets_filepath = os.path.join(data_folder, "msmarco-hard-negatives.jsonl.gz")
 train_queries = {}
 with gzip.open(msmarco_triplets_filepath, 'rt', encoding='utf8') as fIn:
     for line in tqdm(fIn, total=502939):
@@ -81,11 +73,6 @@ with gzip.open(msmarco_triplets_filepath, 'rt', encoding='utf8') as fIn:
         if len(pos_pids) > 0 and len(neg_pids) > 0:
             train_queries[data['qid']] = {'query': queries[data['qid']], 'pos': pos_pids, 'hard_neg': list(neg_pids)}
 
-logging.info("Train queries: {}".format(len(train_queries)))
-
-
-# We create a custom MSMARCO dataset that returns triplets (query, positive, negative)
-# on-the-fly based on the information from the mined-hard-negatives jsonl file.
 
 class MSMARCODataset(Dataset):
     def __init__(self, queries, corpus):
@@ -116,42 +103,19 @@ class MSMARCODataset(Dataset):
         return len(self.queries)
 
 
-# We construct the SentenceTransformer bi-encoder from scratch with mean-pooling
-model_name = "distilbert-base-uncased"
-word_embedding_model = models.Transformer(model_name, max_seq_length=max_seq_length)
-pooling_model = models.Pooling(word_embedding_model.get_word_embedding_dimension())
-model = SentenceTransformer(modules=[word_embedding_model, pooling_model])
-
-#### Provide a high batch-size to train better with triplets!
-retriever = TrainRetriever(model=model, batch_size=train_batch_size)
-
-# For training the SentenceTransformer model, we need a dataset, a dataloader, and a loss used for training.
 train_dataset = MSMARCODataset(train_queries, corpus=corpus)
-train_dataloader = retriever.prepare_train(train_dataset, shuffle=True, dataset_present=True)
+train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size)
 
-#### Training SBERT with cosine-product (default)
-train_loss = losses.MultipleNegativesRankingLoss(model=retriever.model)
-
-#### training SBERT with dot-product
+# Training with cosine-product
+train_loss = losses.MultipleNegativesRankingLoss(model=model)
+# training with dot-product
 # train_loss = losses.MultipleNegativesRankingLoss(model=retriever.model, similarity_fct=util.dot_score, scale=1)
 
-#### If no dev set is present from above use dummy evaluator
-ir_evaluator = retriever.load_dummy_evaluator()
+model.fit(train_objectives=[(train_dataloader, train_loss)],
+          epochs=num_epochs,
+          warmup_steps=warmup_steps,
+          optimizer_params={'lr': 2e-5, 'eps': 1e-6, 'correct_bias': False},
+          output_path=model_save_path,
+          use_amp=use_amp)
 
-#### Provide model save path
-model_save_path = os.path.join(pathlib.Path(__file__).parent.absolute(), "output",
-                               "{}-v3-{}".format(model_name, dataset))
-os.makedirs(model_save_path, exist_ok=True)
-
-#### Configure Train params
-num_epochs = 10
-evaluation_steps = 10000
-warmup_steps = 1000
-
-retriever.fit(train_objectives=[(train_dataloader, train_loss)],
-              evaluator=ir_evaluator,
-              epochs=num_epochs,
-              output_path=model_save_path,
-              warmup_steps=warmup_steps,
-              evaluation_steps=evaluation_steps,
-              use_amp=True)
+print(f"Model saved at {model_save_path}")
