@@ -3,3 +3,7 @@
 /venv/
 /BiEncoder/output/
 /msmarco/
+/Detoxifying_LM/output/
+/__pycache__/
+BiEncoder/__pycache__/
+/Detoxifying_LM/__pycache__/
