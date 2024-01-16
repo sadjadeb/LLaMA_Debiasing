@@ -19,8 +19,9 @@ def train_model():
     random.seed(seed)
 
     train_set_path = os.path.join(data_folder, "/runbm25anserini_top100_with_biases")
+    bert_model_path = "/home/sajadeb/LLaMA_Debiasing/BiEncoder/output/bi-encoder_margin-mse_bert-base-uncased"
 
-    train_set = load_dataset(train_set_path, top_docs_count)
+    train_set = load_dataset(train_set_path, bert_model_path, top_docs_count)
 
     train_buffer = BasicBuffer(30000)
     train_buffer.push_batch(train_set, 3)

@@ -2,9 +2,15 @@ import pandas as pd
 from typing import List
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+from tqdm import tqdm
+from sentence_transformers import SentenceTransformer
 
 
-def load_dataset(read_file: str, top_docs_count: int) -> pd.DataFrame:
+data_folder = '/home/sajadeb/msmarco'
+
+
+def load_dataset(read_file: str, model_save_path: str,  top_docs_count: int) -> pd.DataFrame:
     """
     Load and preprocess dataset.
     
@@ -17,6 +23,28 @@ def load_dataset(read_file: str, top_docs_count: int) -> pd.DataFrame:
     - pd.DataFrame: Processed dataset.
     """
 
+    # Read the corpus files, that contain all the passages. Store them in the corpus dict
+    print('Loading collection...')
+    corpus = {}
+    corpus_filepath = os.path.join(data_folder, 'collection.tsv')
+    with open(corpus_filepath, 'r', encoding='utf8') as f:
+        for line in tqdm(f):
+            pid, passage = line.strip().split("\t")
+            corpus[pid] = passage.strip()
+
+    # Read the test queries, store in queries dict
+    print('Loading queries...')
+    queries = {}
+    queries_filepath = os.path.join(data_folder, 'queries.dev.small.tsv')
+    with open(queries_filepath, 'r', encoding='utf8') as f:
+        for line in f:
+            qid, query = line.strip().split("\t")
+            queries[qid] = query.strip()
+
+    # Load model
+    model = SentenceTransformer(model_save_path, device='cuda:3')
+    print(f'{model_save_path} model loaded.')
+
     dic = {"qid": [], "doc_id": [], "relevance": [], "bias": []}
 
     for i in range(1, 769):
@@ -25,8 +53,9 @@ def load_dataset(read_file: str, top_docs_count: int) -> pd.DataFrame:
     with open(read_file, 'r', encoding='utf8') as f:
         qid_set = set()
         for line in f:
-            qrel = line.strip().split(" ")
-            qid = qrel[0]
+            data = line.strip().split(" ")
+            qid = data[0]
+
             if qid not in qid_set:
                 qid_set.add(qid)
                 row_counter = 1
@@ -34,13 +63,16 @@ def load_dataset(read_file: str, top_docs_count: int) -> pd.DataFrame:
             if row_counter > top_docs_count:
                 continue
             else:
-                doc_id, relevance, bias = qrel[2], qrel[4], float(qrel[6])
+                doc_id, relevance, bias = data[2], data[4], float(data[6])
                 dic["qid"].append(int(qid))
                 dic["doc_id"].append(doc_id)
                 dic["relevance"].append(relevance)
                 dic["bias"].append(bias)
-                for i in range(1, 47):
-                    dic[i].append(0.0)
+
+                vector = model.encode(f'{queries[qid]} {corpus[doc_id]}')
+                for i in range(1, 769):
+                    dic[i].append(vector[i - 1])
+
                 row_counter += 1
 
     df = pd.DataFrame(data=dic).sort_values(["qid", "relevance"], ascending=False)
