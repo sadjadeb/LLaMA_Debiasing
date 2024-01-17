@@ -8,18 +8,18 @@ from dqn import DQNAgent
 from mdp import BasicBuffer
 
 data_folder = "/home/sajadeb/msmarco"
-model_save_path = "output/dqn_model/"
+model_save_path = "output/dqn_model_1/"
+bert_model_path = "/home/sajadeb/LLaMA_Debiasing/BiEncoder/output/bi-encoder_margin-mse_bert-base-uncased"
+train_set_path = os.path.join(data_folder, "runbm25anserini_top100_with_biases")
+
 seed = 0
 epochs = 10
 window = 1
-top_docs_count = 10
+top_docs_count = 1
 
 
 def train_model():
     random.seed(seed)
-
-    train_set_path = os.path.join(data_folder, "/runbm25anserini_top100_with_biases")
-    bert_model_path = "/home/sajadeb/LLaMA_Debiasing/BiEncoder/output/bi-encoder_margin-mse_bert-base-uncased"
 
     train_set = load_dataset(train_set_path, bert_model_path, top_docs_count)
 
@@ -32,7 +32,7 @@ def train_model():
     for _ in trange(epochs):
         y.append(agent.update(1, verbose=True))
 
-    torch.save(agent.model.state_dict(), model_save_path)
+    torch.save(agent.model.state_dict(), os.path.join(model_save_path, "model.pt"))
 
     y = [float(x) for x in y]
 

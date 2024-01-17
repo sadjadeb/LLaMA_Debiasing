@@ -28,14 +28,14 @@ def load_dataset(read_file: str, model_save_path: str,  top_docs_count: int) -> 
     corpus = {}
     corpus_filepath = os.path.join(data_folder, 'collection.tsv')
     with open(corpus_filepath, 'r', encoding='utf8') as f:
-        for line in tqdm(f):
+        for line in f:
             pid, passage = line.strip().split("\t")
             corpus[pid] = passage.strip()
 
     # Read the test queries, store in queries dict
     print('Loading queries...')
     queries = {}
-    queries_filepath = os.path.join(data_folder, 'queries.dev.small.tsv')
+    queries_filepath = os.path.join(data_folder, 'queries.train.tsv')
     with open(queries_filepath, 'r', encoding='utf8') as f:
         for line in f:
             qid, query = line.strip().split("\t")
@@ -47,12 +47,12 @@ def load_dataset(read_file: str, model_save_path: str,  top_docs_count: int) -> 
 
     dic = {"qid": [], "doc_id": [], "relevance": [], "bias": []}
 
-    for i in range(1, 769):
+    for i in range(1, 767):
         dic[i] = []
 
     with open(read_file, 'r', encoding='utf8') as f:
         qid_set = set()
-        for line in f:
+        for line in tqdm(f, total=50289125):
             data = line.strip().split(" ")
             qid = data[0]
 
@@ -69,8 +69,8 @@ def load_dataset(read_file: str, model_save_path: str,  top_docs_count: int) -> 
                 dic["relevance"].append(relevance)
                 dic["bias"].append(bias)
 
-                vector = model.encode(f'{queries[qid]} {corpus[doc_id]}')
-                for i in range(1, 769):
+                vector = model.encode(f'{queries[qid]}[SEP]{corpus[doc_id]}')
+                for i in range(1, 767):
                     dic[i].append(vector[i - 1])
 
                 row_counter += 1
