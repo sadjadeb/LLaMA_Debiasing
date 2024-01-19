@@ -10,7 +10,7 @@ from sentence_transformers import SentenceTransformer
 data_folder = '/home/sajadeb/msmarco'
 
 
-def load_dataset(read_file: str, model_save_path: str,  top_docs_count: int) -> pd.DataFrame:
+def load_dataset(read_file: str, model_save_path: str,  top_docs_count: int, is_training: bool) -> pd.DataFrame:
     """
     Load and preprocess dataset.
     
@@ -24,6 +24,14 @@ def load_dataset(read_file: str, model_save_path: str,  top_docs_count: int) -> 
     """
 
     # Read the corpus files, that contain all the passages. Store them in the corpus dict
+
+    saved_file = os.path.join(data_folder, f'encoded_dataset_{"train" if is_training else "dev_small"}.csv')
+    if os.path.exists(saved_file):
+        print('Loading saved dataset...')
+        df = pd.read_csv(saved_file)
+        print('Saved dataset loaded.')
+        return df
+
     print('Loading collection...')
     corpus = {}
     corpus_filepath = os.path.join(data_folder, 'collection.tsv')
@@ -35,7 +43,10 @@ def load_dataset(read_file: str, model_save_path: str,  top_docs_count: int) -> 
     # Read the test queries, store in queries dict
     print('Loading queries...')
     queries = {}
-    queries_filepath = os.path.join(data_folder, 'queries.train.tsv')
+    if is_training:
+        queries_filepath = os.path.join(data_folder, 'queries.train.tsv')
+    else:
+        queries_filepath = os.path.join(data_folder, 'queries.dev.small.tsv')
     with open(queries_filepath, 'r', encoding='utf8') as f:
         for line in f:
             qid, query = line.strip().split("\t")
@@ -47,7 +58,7 @@ def load_dataset(read_file: str, model_save_path: str,  top_docs_count: int) -> 
 
     dic = {"qid": [], "doc_id": [], "relevance": [], "bias": []}
 
-    for i in range(1, 767):
+    for i in range(1, 769):
         dic[i] = []
 
     with open(read_file, 'r', encoding='utf8') as f:
@@ -70,13 +81,15 @@ def load_dataset(read_file: str, model_save_path: str,  top_docs_count: int) -> 
                 dic["bias"].append(bias)
 
                 vector = model.encode(f'{queries[qid]}[SEP]{corpus[doc_id]}')
-                for i in range(1, 767):
+                for i in range(1, 769):
                     dic[i].append(vector[i - 1])
 
                 row_counter += 1
 
     df = pd.DataFrame(data=dic).sort_values(["qid", "relevance"], ascending=False)
     print("Loaded data from run file")
+
+    df.to_csv(saved_file, index=False)
 
     return df
 

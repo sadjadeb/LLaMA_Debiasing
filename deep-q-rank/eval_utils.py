@@ -222,7 +222,7 @@ def get_just_tau(agent, dataset):
 
 
 def write_trec_results(agent, dataset, feature_name, output_file_path: str):
-    with open(output_file_path, 'a+') as file:
+    with open(output_file_path, 'w') as file:
         for qid in set(dataset["qid"]):
             agent_ranking = get_agent_ranking_list(agent, qid, dataset)
             for rank, doc_id in enumerate(agent_ranking, start=1):
