@@ -6,7 +6,7 @@ import os
 
 
 data_folder = '/home/sajadeb/msmarco'
-wordlist_path = "resources/wordlist_genderspecific.txt"
+wordlist_path = "../resources/wordlist_genderspecific.txt"
 
 docs_bias_save_paths = {'tc': "docs_bias_tc.pkl",
                         'bool': "docs_bias_bool.pkl",

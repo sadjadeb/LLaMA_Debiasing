@@ -11,7 +11,7 @@ docs_bias_paths = {'tf': "documents_bias_tf.pkl"}
 
 at_rank_list = [5, 10]
 save_path_base = "deep-q-rank/output/"
-queries_gender_annotated_path = "resources/queries_gender_annotated.csv"
+queries_gender_annotated_path = "../resources/queries_gender_annotated.csv"
 
 # Loading saved document bias values
 docs_bias = {}
@@ -21,15 +21,15 @@ for _method in docs_bias_paths:
         docs_bias[_method] = pickle.load(fr)
 
 # Loading gendered queries
-qryids_filter = []
+qids_filter = []
 with open(queries_gender_annotated_path, 'r') as fr:
     for line in fr:
         vals = line.strip().split(',')
-        qryid = int(vals[0])
-        qryids_filter.append(qryid)
+        qid = int(vals[0])
+        qids_filter.append(qid)
 
-qryids_filter = set(qryids_filter)
-print(len(qryids_filter))
+qids_filter = set(qids_filter)
+print(len(qids_filter))
 
 # Loading run files
 runs_docs_bias = {}
@@ -41,29 +41,30 @@ for exp_name in experiments:
         runs_docs_bias[exp_name][_method] = {}
 
     with open(run_path) as fr:
-        qryid_cur = 0
+        qid_cur = 0
         for i, line in enumerate(fr):
             vals = line.strip().split(' ')
             if len(vals) == 6:
-                qryid = int(vals[0])
-                docid = int(vals[2])
+                qid = int(vals[0])
+                doc_id = int(vals[2])
 
-                if qryid not in qryids_filter:
+                if qid not in qids_filter:
                     continue
 
                 print('reach')
-                if qryid != qryid_cur:
+                if qid != qid_cur:
                     for _method in docs_bias_paths:
-                        runs_docs_bias[exp_name][_method][qryid] = []
-                    qryid_cur = qryid
+                        runs_docs_bias[exp_name][_method][qid] = []
+                    qid_cur = qid
                 for _method in docs_bias_paths:
-                    print(docs_bias[_method][docid])
-                    runs_docs_bias[exp_name][_method][qryid].append(docs_bias[_method][docid])
+                    print(docs_bias[_method][doc_id])
+                    runs_docs_bias[exp_name][_method][qid].append(docs_bias[_method][doc_id])
 
     for _method in docs_bias_paths:
         print(f"Number of effective queries in {exp_name} using {_method} : {len(runs_docs_bias[exp_name][_method].keys())}")
 
 print(runs_docs_bias.keys())
+
 
 def calc_RaB_q(bias_list, at_rank):
     bias_val = np.mean([x[0] for x in bias_list[:at_rank]])
@@ -92,26 +93,20 @@ def calc_ARaB_q(bias_list, at_rank):
 
 
 print('Calculating ranking bias ...')
-qry_bias_RaB = {}
-qry_bias_ARaB = {}
+query_bias_ARaB = {}
 for exp_name in experiments:
-    qry_bias_RaB[exp_name] = {}
-    qry_bias_ARaB[exp_name] = {}
+    query_bias_ARaB[exp_name] = {}
 
     for _method in docs_bias_paths:
         print(exp_name, _method)
 
-        qry_bias_RaB[exp_name][_method] = {}
-        qry_bias_ARaB[exp_name][_method] = {}
+        query_bias_ARaB[exp_name][_method] = {}
 
         for at_rank in at_rank_list:
-            qry_bias_RaB[exp_name][_method][at_rank] = {}
-            qry_bias_ARaB[exp_name][_method][at_rank] = {}
+            query_bias_ARaB[exp_name][_method][at_rank] = {}
 
-            for qry_id in runs_docs_bias[exp_name][_method]:
-                qry_bias_RaB[exp_name][_method][at_rank][qry_id] = calc_RaB_q(runs_docs_bias[exp_name][_method][qry_id], at_rank)
-                qry_bias_ARaB[exp_name][_method][at_rank][qry_id] = calc_ARaB_q(runs_docs_bias[exp_name][_method][qry_id], at_rank)
-
+            for qid in runs_docs_bias[exp_name][_method]:
+                query_bias_ARaB[exp_name][_method][at_rank][qid] = calc_ARaB_q(runs_docs_bias[exp_name][_method][qid], at_rank)
 
 print('Saving results ...')
 for exp_name in experiments:
@@ -119,8 +114,5 @@ for exp_name in experiments:
         save_path = save_path_base + f"run_bias_{exp_name}_{_method}"
         print(save_path)
 
-        with open(save_path + '_RaB.pkl', 'wb') as fw:
-            pickle.dump(qry_bias_RaB[exp_name][_method], fw)
-
         with open(save_path + '_ARaB.pkl', 'wb') as fw:
-            pickle.dump(qry_bias_ARaB[exp_name][_method], fw)
+            pickle.dump(query_bias_ARaB[exp_name][_method], fw)
