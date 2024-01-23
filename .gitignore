@@ -7,3 +7,6 @@
 /__pycache__/
 BiEncoder/__pycache__/
 /Detoxifying_LM/__pycache__/
+/deep-q-rank/__pycache__/
+/deep-q-rank/output/
+/calculate_bias/__pycache__/
