@@ -67,9 +67,9 @@ with open(corpus_filepath, 'r', encoding='utf8') as f:
 docs_bias = {'tc': {}, 'tf': {}, 'bool': {}}
 for pid, text in tqdm(corpus.items()):
     biases = get_bias(get_tokens(text))
-    docs_bias['tc'][pid] = biases[0][0]
-    docs_bias['tf'][pid] = biases[1][0]
-    docs_bias['bool'][pid] = biases[2][0]
+    docs_bias['tc'][pid] = biases[0]
+    docs_bias['tf'][pid] = biases[1]
+    docs_bias['bool'][pid] = biases[2]
 
 with open('documents_bias_tf.pkl', 'wb') as handle:
     pickle.dump(docs_bias['tf'], handle, protocol=pickle.HIGHEST_PROTOCOL)

@@ -2,23 +2,21 @@ import numpy as np
 import pickle
 
 # Paths to TREC run files
-experiments = {'BM25': '/home/sajadeb/msmarco/runbm25anserini.dev',
-               'BERT': 'BiEncoder/output/bi-encoder_margin-mse_bert-base-uncased/Run.txt',
-               'DQN': 'deep-q-rank/output/dqn_model/Run_10.txt',
-               }
+experiments = {'biased': '/home/sajadeb/msmarco/run.neutral_queries.trec',
+               'unbiased': '/home/sajadeb/LLaMA_Debiasing/deep-q-rank/output/dqn_model/Run_nn.txt'}
 
 docs_bias_paths = {'tf': "documents_bias_tf.pkl"}
 
-at_rank_list = [5, 10]
-save_path_base = "deep-q-rank/output/"
+at_rank_list = [5, 10, 20]
 queries_gender_annotated_path = "../resources/queries_gender_annotated.csv"
 
 # Loading saved document bias values
 docs_bias = {}
 for _method in docs_bias_paths:
-    print(_method)
+    print(f"Loading {_method} bias values ...")
     with open(docs_bias_paths[_method], 'rb') as fr:
         docs_bias[_method] = pickle.load(fr)
+        docs_bias[_method] = {int(k): v for k, v in docs_bias[_method].items()}
 
 # Loading gendered queries
 qids_filter = []
@@ -28,8 +26,7 @@ with open(queries_gender_annotated_path, 'r') as fr:
         qid = int(vals[0])
         qids_filter.append(qid)
 
-qids_filter = set(qids_filter)
-print(len(qids_filter))
+print(f"Total number of gendered queries: {len(qids_filter)}")
 
 # Loading run files
 runs_docs_bias = {}
@@ -43,27 +40,23 @@ for exp_name in experiments:
     with open(run_path) as fr:
         qid_cur = 0
         for i, line in enumerate(fr):
-            vals = line.strip().split(' ')
-            if len(vals) == 6:
-                qid = int(vals[0])
-                doc_id = int(vals[2])
+            data = line.strip().split()
+            qid = int(data[0])
+            doc_id = int(data[2])
 
-                if qid not in qids_filter:
-                    continue
+            if qid not in qids_filter:
+                continue
 
-                print('reach')
-                if qid != qid_cur:
-                    for _method in docs_bias_paths:
-                        runs_docs_bias[exp_name][_method][qid] = []
-                    qid_cur = qid
+            if qid != qid_cur:
                 for _method in docs_bias_paths:
-                    print(docs_bias[_method][doc_id])
-                    runs_docs_bias[exp_name][_method][qid].append(docs_bias[_method][doc_id])
+                    runs_docs_bias[exp_name][_method][qid] = []
+                qid_cur = qid
+
+            for _method in docs_bias_paths:
+                runs_docs_bias[exp_name][_method][qid].append(docs_bias[_method][doc_id])
 
     for _method in docs_bias_paths:
         print(f"Number of effective queries in {exp_name} using {_method} : {len(runs_docs_bias[exp_name][_method].keys())}")
-
-print(runs_docs_bias.keys())
 
 
 def calc_RaB_q(bias_list, at_rank):
@@ -98,7 +91,7 @@ for exp_name in experiments:
     query_bias_ARaB[exp_name] = {}
 
     for _method in docs_bias_paths:
-        print(exp_name, _method)
+        print(f"Calculating ranking bias for {exp_name} based on {_method} ...")
 
         query_bias_ARaB[exp_name][_method] = {}
 
@@ -111,8 +104,9 @@ for exp_name in experiments:
 print('Saving results ...')
 for exp_name in experiments:
     for _method in docs_bias_paths:
-        save_path = save_path_base + f"run_bias_{exp_name}_{_method}"
-        print(save_path)
+        save_path = f"run_bias_{exp_name}_{_method}"
 
         with open(save_path + '_ARaB.pkl', 'wb') as fw:
             pickle.dump(query_bias_ARaB[exp_name][_method], fw)
+
+        print(f"Results saved to {save_path}")

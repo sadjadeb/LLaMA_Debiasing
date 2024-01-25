@@ -1,7 +1,7 @@
 import numpy as np
 import pickle
 
-experiments = ['BM25', 'BERT', 'DQN']
+experiments = ['biased', 'unbiased']
 
 metrics = ['ARaB']
 methods = ['tf']
@@ -12,11 +12,11 @@ for metric in metrics:
     for exp_name in experiments:
         qry_bias_paths[metric][exp_name] = {}
         for _method in methods:
-            qry_bias_paths[metric][exp_name][_method] = f'output/run_bias_{exp_name}_{_method}_{metric}.pkl'
+            qry_bias_paths[metric][exp_name][_method] = f'run_bias_{exp_name}_{_method}_{metric}.pkl'
 
 queries_gender_annotated_path = "../resources/queries_gender_annotated.csv"
 
-at_ranklist = [5, 10, 20, 30, 40]
+at_rank_list = [5, 10, 20]
 
 query_bias_per_query = {}
 
@@ -26,7 +26,7 @@ for metric in metrics:
         query_bias_per_query[metric][exp_name] = {}
         for _method in methods:
             _path = qry_bias_paths[metric][exp_name][_method]
-            print(_path)
+            print(f"Loading {metric} bias values from {_path} ...")
             with open(_path, 'rb') as fr:
                 query_bias_per_query[metric][exp_name][_method] = pickle.load(fr)
 
@@ -57,7 +57,7 @@ for metric in metrics:
             eval_results_bias[metric][exp_name][_method] = {}
             eval_results_feml[metric][exp_name][_method] = {}
             eval_results_male[metric][exp_name][_method] = {}
-            for at_rank in at_ranklist:
+            for at_rank in at_rank_list:
                 _bias_list = []
                 _feml_list = []
                 _male_list = []
@@ -76,15 +76,10 @@ for metric in metrics:
                 eval_results_feml[metric][exp_name][_method][at_rank] = np.mean(_feml_list)
                 eval_results_male[metric][exp_name][_method][at_rank] = np.mean(_male_list)
 
+print()
 for metric in metrics:
-    print(metric)
-    for at_rank in at_ranklist:
+    for at_rank in at_rank_list:
         for _method in methods:
             for exp_name in experiments:
-                print("%25s\t%2d %5s\t%f\t%f\t%f" % (exp_name,
-                                                     at_rank,
-                                                     _method,
-                                                     eval_results_bias[metric][exp_name][_method][at_rank],
-                                                     eval_results_feml[metric][exp_name][_method][at_rank],
-                                                     eval_results_male[metric][exp_name][_method][at_rank]))
-        print("==========")
+                print(f"{exp_name:15}\tcutoff@{at_rank}\t{_method}\t{eval_results_bias[metric][exp_name][_method][at_rank]:.6f}")
+        print("------------------------------------------------")
