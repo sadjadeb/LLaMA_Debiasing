@@ -6,11 +6,10 @@ import os
 from tqdm import tqdm
 from sentence_transformers import SentenceTransformer
 
-
 data_folder = '/home/sajadeb/msmarco'
 
 
-def load_dataset(read_file: str, model_save_path: str,  top_docs_count: int, is_training: bool) -> pd.DataFrame:
+def load_dataset(read_file: str, model_save_path: str, top_docs_count: int, is_training: bool) -> pd.DataFrame:
     """
     Load and preprocess dataset.
     
@@ -46,7 +45,7 @@ def load_dataset(read_file: str, model_save_path: str,  top_docs_count: int, is_
     if is_training:
         queries_filepath = os.path.join(data_folder, 'queries.train.tsv')
     else:
-        queries_filepath = os.path.join(data_folder, 'queries.dev.small.tsv')
+        queries_filepath = os.path.join(data_folder, 'neutral_queries.tsv')
     with open(queries_filepath, 'r', encoding='utf8') as f:
         for line in f:
             qid, query = line.strip().split("\t")
@@ -63,7 +62,7 @@ def load_dataset(read_file: str, model_save_path: str,  top_docs_count: int, is_
 
     with open(read_file, 'r', encoding='utf8') as f:
         qid_set = set()
-        for line in tqdm(f, total=50289125):
+        for line in tqdm(f, total=50289125 if is_training else 1764374):
             data = line.strip().split(" ")
             qid = data[0]
 
