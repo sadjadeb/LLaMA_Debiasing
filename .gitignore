@@ -10,3 +10,4 @@ BiEncoder/__pycache__/
 /deep-q-rank/__pycache__/
 /deep-q-rank/output/
 /calculate_bias/__pycache__/
+calculate_bias/*.pkl
