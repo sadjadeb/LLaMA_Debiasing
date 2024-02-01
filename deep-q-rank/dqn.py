@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.autograd as autograd
-from torchcontrib.optim import SWA
 from utils import get_model_inputs, get_multiple_model_inputs
 
 
@@ -28,9 +27,7 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, input_dim, dataset, learning_rate=3e-4, gamma=0.99, buffer=None, tau=0.999, swa=False,
-                 pre_trained_model=None):
-
+    def __init__(self, input_dim, dataset, learning_rate=3e-4, gamma=0.99, buffer=None, tau=0.999, pre_trained_model=None):
         self.learning_rate = learning_rate
         self.gamma = gamma
         self.tau = tau
@@ -38,15 +35,10 @@ class DQNAgent:
         if pre_trained_model:
             self.model = pre_trained_model
         base_opt = torch.optim.Adam(self.model.parameters())
-        self.swa = swa
         self.dataset = dataset
         self.MSE_loss = nn.MSELoss()
         self.replay_buffer = buffer
-
-        if swa:
-            self.optimizer = SWA(base_opt, swa_start=10, swa_freq=5, swa_lr=0.05)
-        else:
-            self.optimizer = base_opt
+        self.optimizer = base_opt
 
     def get_action(self, state, dataset=None):
         if dataset is None:
@@ -88,6 +80,4 @@ class DQNAgent:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        if self.swa:
-            self.optimizer.swap_swa_sgd()
         return train_loss
