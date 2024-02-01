@@ -11,8 +11,7 @@ def compute_reward(t, relevance, bias):
     """
     if t == 0:
         return 0
-    # return relevance / np.log2(t + 1)
-    return (float(relevance) * 1000000 / np.log2(t + 1)) + (1 / (abs(bias) + 1))
+    return ((10 * relevance) - abs(bias)) / np.log2(t + 1)
 
 
 class State:
@@ -47,13 +46,14 @@ class BasicBuffer:
             random_qid = random.choice(list(df["qid"]))
             filtered_df = df.loc[df["qid"] == int(random_qid)].reset_index()
             row_order = [x for x in range(len(filtered_df))]
-            zzz = [x[1]["doc_id"] for x in filtered_df.iterrows()]
+            remaining_docs = [x[1]["doc_id"] for x in filtered_df.iterrows()]
             random.shuffle(row_order)
             for t, r in enumerate(row_order):
                 cur_row = filtered_df.iloc[r]
-                old_state = State(t, cur_row["qid"], zzz[:])
+                old_state = State(t, cur_row["qid"], remaining_docs[:])
                 action = cur_row["doc_id"]
-                new_state = State(t + 1, cur_row["qid"], zzz[:])
+                remaining_docs.remove(action)
+                new_state = State(t + 1, cur_row["qid"], remaining_docs[:])
                 reward = compute_reward(t + 1, cur_row["relevance"], cur_row["bias"])
                 self.push(old_state, action, reward, new_state, t + 1 == len(row_order))
                 filtered_df.drop(filtered_df.index[[r]])

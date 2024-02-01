@@ -12,9 +12,15 @@ class DQN(nn.Module):
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.fc = nn.Sequential(
-            nn.Linear(self.input_dim[0], 32),
+            nn.Linear(self.input_dim[0], 384),
             nn.ReLU(),
-            nn.Linear(32, self.output_dim)
+            nn.Linear(384, 192),
+            nn.ReLU(),
+            nn.Linear(192, 96),
+            nn.ReLU(),
+            nn.Linear(96, 48),
+            nn.ReLU(),
+            nn.Linear(48, self.output_dim)
         )
 
     def forward(self, state):
@@ -59,18 +65,20 @@ class DQNAgent:
         rewards = np.array(rewards)
         rewards = torch.FloatTensor(rewards)
         dones = torch.FloatTensor(dones)
-
-        curr_q = self.model.forward(model_inputs)
-        model_inputs = np.array(
-            [get_model_inputs(next_states[i], actions[i], dataset) for i in range(len(next_states))])
-        model_inputs = torch.FloatTensor(model_inputs)
-        next_q = self.model.forward(model_inputs)
-        max_next_q = torch.max(next_q, 1)[0]
-        expected_q = rewards.squeeze(1) + (1 - dones) * self.gamma * max_next_q
-
-        if verbose:
-            print(curr_q, expected_q)
-        loss = self.MSE_loss(curr_q.squeeze(0), expected_q.detach())
+        curr_Q = self.model.forward(model_inputs)
+        stacked_arrays = []
+        for i in range(len(next_states[0].remaining)):
+            temp = get_model_inputs(next_states[0], next_states[0].remaining[i], dataset)
+            stacked_arrays.append(temp)
+        if stacked_arrays:
+            result_array = np.vstack(stacked_arrays)
+            model_inputs = torch.FloatTensor(result_array)
+            next_Q = self.model.forward(model_inputs)
+            max_next_Q = torch.max(next_Q, 1)[0].max().item()
+            expected_Q = rewards.squeeze(1) + (1 - dones) * self.gamma * max_next_Q
+        else:
+            expected_Q = rewards.squeeze(1)
+        loss = self.MSE_loss(curr_Q.squeeze(0), expected_Q.detach())
         return loss
 
     def update(self, batch_size, verbose=False):

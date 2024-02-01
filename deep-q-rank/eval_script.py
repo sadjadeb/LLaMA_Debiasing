@@ -16,9 +16,9 @@ ndcg_k_list = [10]
 def eval_model():
     test_set = load_dataset(test_set_path, bert_model_path, top_docs_count, is_training=False)
 
-    model = DQN((770,), 1)
+    model = DQN((769,), 1)
     model.load_state_dict(torch.load(pretrained_model_path))
-    agent = DQNAgent((770,), learning_rate=3e-4, buffer=None, dataset=None, pre_trained_model=model)
+    agent = DQNAgent((769,), learning_rate=3e-4, buffer=None, dataset=None, pre_trained_model=model)
 
     ndcg_list = eval_agent_final(agent, ndcg_k_list, test_set)
     output_file_path = os.path.join(model_save_path, f"Run_nn.txt")

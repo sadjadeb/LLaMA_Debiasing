@@ -1,7 +1,7 @@
 from scipy.stats import kendalltau, spearmanr
 import numpy as np
 import random
-from mdp import compute_reward, State
+from mdp import State
 
 
 def dcg_at_k(r, k, method=0):
@@ -75,30 +75,6 @@ def evaluate_ranking_list(r, qid, k, dataset):
     """
     relevance_list = get_feature_for_docs(r, qid, dataset, "relevance")
     return ndcg_at_k(relevance_list, k)
-
-
-def reward_from_query(agent, qid, df):
-    """
-    Run agent to rank a whole (single) query
-    agent: DQN agent
-    qid: string query id4
-    """
-    filtered_df = df.loc[df["qid"] == int(qid)].reset_index()
-    remaining = list(filtered_df["doc_id"])
-    state = State(0, qid, remaining)
-    total_reward, t = 0, 0
-    while not state.terminal:
-        next_action = agent.get_action(state)
-        t += 1
-        remaining.remove(next_action)
-        state = State(t, qid, remaining)
-
-        reward = compute_reward(t,
-                                get_feature(qid, next_action, letor, "relevance"),
-                                get_feature(qid, next_action, letor, "bias")
-                                )
-        total_reward += reward
-    return total_reward
 
 
 def get_agent_ranking_list(agent, qid, df):

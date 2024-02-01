@@ -12,7 +12,7 @@ model_save_path = "output/dqn_model/"
 bert_model_path = "/home/sajadeb/LLaMA_Debiasing/BiEncoder/output/bi-encoder_margin-mse_bert-base-uncased"
 train_set_path = os.path.join(data_folder, "runbm25anserini_top100_with_biases")
 
-seed = 0
+seed = 42
 epochs = 10
 window = 1
 top_docs_count = 10
@@ -26,11 +26,11 @@ def train_model():
     train_buffer = BasicBuffer(30000)
     train_buffer.push_batch(train_set, 3)
 
-    agent = DQNAgent((770,), learning_rate=3e-4, buffer=train_buffer, dataset=train_set)
+    agent = DQNAgent((769,), learning_rate=3e-4, buffer=train_buffer, dataset=train_set)
 
     y = []
     for _ in trange(epochs):
-        y.append(agent.update(1, verbose=True))
+        y.append(agent.update(1))
 
     torch.save(agent.model.state_dict(), os.path.join(model_save_path, "model.pt"))
 
@@ -38,7 +38,7 @@ def train_model():
 
     print(f"Training Loss: {y}")
 
-    plot_ma_log10(y, window, model_save_path, label="train loss")
+    plot_ma_log10(y, window, model_save_path + "train_loss", label="train loss")
 
 
 if __name__ == "__main__":

@@ -140,7 +140,7 @@ def get_features(qid, doc_id, dataset) -> List[float]:
     assert len(df) != 0, "Fix the dataset"
 
     df_copy = df.copy()
-    df_copy.drop(["qid", "doc_id", "relevance"], axis=1, inplace=True)
+    df_copy.drop(["qid", "doc_id", "relevance", "bias"], axis=1, inplace=True)
     df = df_copy
     return df.values.tolist()[0]
 
@@ -165,7 +165,7 @@ def get_query_features(qid, doc_list, dataset) -> np.ndarray:
     else:
         df = dataset[dataset["qid"] == qid]
     assert len(df) != 0
-    df.drop(["qid", "doc_id", "relevance"], axis=1, inplace=True)
+    df.drop(["qid", "doc_id", "relevance", "bias"], axis=1, inplace=True)
     return df.values
 
 
