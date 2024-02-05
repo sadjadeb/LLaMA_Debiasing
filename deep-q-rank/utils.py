@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import CrossEncoder
 import random
 from mdp import State
 
@@ -14,19 +14,25 @@ data_folder = '/home/sajadeb/msmarco'
 def load_dataset(read_file: str, model_save_path: str, top_docs_count: int, is_training: bool) -> pd.DataFrame:
     """
     Load and preprocess dataset.
-    
+
     Args:
     - read_file (str): Path to the input file.
     - top_docs_count (int): Number of top documents to consider for each query.
     - save_file (str): Path to save the processed file for possible future use.
-    
+
     Returns:
     - pd.DataFrame: Processed dataset.
     """
 
     # Read the corpus files, that contain all the passages. Store them in the corpus dict
 
-    saved_file = os.path.join(data_folder, f'encoded_dataset_{"train" if is_training else "dev_small"}.csv')
+    if is_training:
+        saved_file = os.path.join(data_folder, f'encoded_dataset_train_ce.csv')
+        queries_filepath = os.path.join(data_folder, 'queries.train.tsv')
+    else:
+        saved_file = os.path.join(data_folder, f'encoded_dataset_neutral_ce.csv')
+        queries_filepath = os.path.join(data_folder, 'neutral_queries.tsv')
+
     if os.path.exists(saved_file):
         print('Loading saved dataset...')
         df = pd.read_csv(saved_file)
@@ -44,17 +50,15 @@ def load_dataset(read_file: str, model_save_path: str, top_docs_count: int, is_t
     # Read the test queries, store in queries dict
     print('Loading queries...')
     queries = {}
-    if is_training:
-        queries_filepath = os.path.join(data_folder, 'queries.train.tsv')
-    else:
-        queries_filepath = os.path.join(data_folder, 'neutral_queries.tsv')
     with open(queries_filepath, 'r', encoding='utf8') as f:
         for line in f:
             qid, query = line.strip().split("\t")
             queries[qid] = query.strip()
 
     # Load model
-    model = SentenceTransformer(model_save_path, device='cuda:3')
+    device = 'cuda:0'
+    cross_encoder = CrossEncoder(model_save_path, device=device)
+    model = cross_encoder.model.bert.to(device)
     print(f'{model_save_path} model loaded.')
 
     dic = {"qid": [], "doc_id": [], "relevance": [], "bias": []}
@@ -64,7 +68,7 @@ def load_dataset(read_file: str, model_save_path: str, top_docs_count: int, is_t
 
     with open(read_file, 'r', encoding='utf8') as f:
         qid_set = set()
-        for line in tqdm(f, total=50289125 if is_training else 1764374):
+        for line in tqdm(f, total=502939000 if is_training else 1764374):
             data = line.strip().split(" ")
             qid = data[0]
 
@@ -75,13 +79,16 @@ def load_dataset(read_file: str, model_save_path: str, top_docs_count: int, is_t
             if row_counter > top_docs_count:
                 continue
             else:
-                doc_id, relevance, bias = data[2], data[4], float(data[6])
+                doc_id, relevance, bias = data[2], float(data[4]), float(data[6])
                 dic["qid"].append(int(qid))
                 dic["doc_id"].append(doc_id)
                 dic["relevance"].append(relevance)
                 dic["bias"].append(bias)
 
-                vector = model.encode(f'{queries[qid]}[SEP]{corpus[doc_id]}')
+                text = f'{queries[qid]}[SEP]{corpus[doc_id]}'
+                tokens = cross_encoder.tokenizer(text, return_tensors="pt").to(device)
+                vector = model(**tokens).pooler_output.detach().cpu().numpy().tolist()[0]
+
                 for i in range(1, 769):
                     dic[i].append(vector[i - 1])
 

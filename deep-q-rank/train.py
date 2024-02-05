@@ -9,8 +9,8 @@ from mdp import BasicBuffer
 
 data_folder = "/home/sajadeb/msmarco"
 model_save_path = "output/dqn_model/"
-bert_model_path = "/home/sajadeb/LLaMA_Debiasing/BiEncoder/output/bi-encoder_margin-mse_bert-base-uncased"
-train_set_path = os.path.join(data_folder, "runbm25anserini_top100_with_biases")
+bert_model_path = "/home/sajadeb/LLaMA_Debiasing/CrossEncoder/output/cross-encoder_bert-base-uncased/"
+train_set_path = "/home/sajadeb/LLaMA_Debiasing/BiEncoder/output/bi-encoder_margin-mse_bert-base-uncased/Run_train_with_biases.txt"
 
 seed = 42
 epochs = 10
