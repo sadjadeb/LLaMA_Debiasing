@@ -1,7 +1,8 @@
 from sentence_transformers import CrossEncoder
 import os
+import sys
 from tqdm import tqdm
-import ir_datasets, ir_measures
+import ir_measures
 from ir_measures import *
 
 LOCAL = True if sys.platform == 'win32' else False
@@ -71,6 +72,6 @@ with open(run_output_path, 'w', encoding='utf-8') as out:
             out.write(f'{qid} Q0 {hit["pid"]} {rank + 1} {hit["score"]} CrossEncoder\n')
 
 print('Evaluation...')
-qrels = ir_datasets.load('msmarco-passage/dev/small').qrels_iter()
+qrels = ir_measures.read_trec_qrels(os.path.join(data_folder, 'qrels.dev.small.tsv'))
 run = ir_measures.read_trec_run(run_output_path)
 print(ir_measures.calc_aggregate([nDCG@10, P@10, AP@10, RR@10, R@10], qrels, run))

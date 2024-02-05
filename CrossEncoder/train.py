@@ -18,7 +18,7 @@ num_epochs = 1
 warmup_steps = 5000
 device = 'cpu' if LOCAL else 'cuda:1'
 # Maximal number of training samples we want to use
-max_train_samples = 2e7
+max_train_samples = 2e6
 # We use a positive-to-negative ratio: For 1 positive sample (label 1) we include 4 negative samples (label 0)
 pos_neg_ration = 4
 
@@ -47,24 +47,6 @@ with open(queries_filepath, 'r', encoding='utf8') as fIn:
     for line in fIn:
         qid, query = line.strip().split("\t")
         queries[qid] = query
-
-# Read the train passages entities, store in passages_entities dict
-passages_entities = {}
-passages_entities_filepath = os.path.join(data_folder, 'entities', 'docs_entities.tsv')
-with open(passages_entities_filepath, 'r', encoding='utf8') as fIn:
-    print('Loading passages entities...')
-    for line in fIn:
-        pid, entities = line.strip().split("\t")
-        passages_entities[pid] = eval(entities)
-
-# Read the train queries entities, store in queries_entities dict
-queries_entities = {}
-queries_entities_filepath = os.path.join(data_folder, 'entities', 'queries_entities.tsv')
-with open(queries_entities_filepath, 'r', encoding='utf8') as fIn:
-    print('Loading queries entities...')
-    for line in fIn:
-        qid, entities = line.strip().split("\t")
-        queries_entities[qid] = eval(entities)
 
 # Read our training file
 cnt = 0
