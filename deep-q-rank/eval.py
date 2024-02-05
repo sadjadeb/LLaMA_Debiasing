@@ -1,9 +1,8 @@
 import torch
-from utils import load_dataset
-from eval_utils import write_trec_results
+from utils import load_dataset, write_trec_results
 from dqn import DQN, DQNAgent
 import os
-import ir_datasets, ir_measures
+import ir_measures
 from ir_measures import *
 from calculate_bias import calculate_run_bias, calculate_cumulative_bias
 
